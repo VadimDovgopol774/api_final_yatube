@@ -9,37 +9,39 @@ from posts.models import Comment, Follow, Group, Post
 User = get_user_model()
 
 
-class GroupSerializer(serializers.ModelSerializer):
+class PostSerializer(serializers.ModelSerializer):
+    author = SlugRelatedField(
+        slug_field='username',
+        read_only=True
+    )
 
     class Meta:
         fields = '__all__'
-        model = Group
+        model = Post
 
 
 class CommentSerializer(serializers.ModelSerializer):
     author = SlugRelatedField(
-        read_only=True, slug_field='username'
+        read_only=True,
+        slug_field='username',
     )
 
     class Meta:
         fields = '__all__'
         model = Comment
-        read_only_fields = ('author', 'created', 'post')
+        read_only_fields = ('post',)
 
 
-class PostSerializer(serializers.ModelSerializer):
-    author = SlugRelatedField(slug_field='username', read_only=True)
-
+class GroupSerializer(serializers.ModelSerializer):
     class Meta:
-        fields = ('id', 'author', 'text', 'pub_date', 'image', 'group')
-        model = Post
-        read_only_fields = ('author', 'pub_date')
+        fields = '__all__'
+        model = Group
 
 
 class FollowSerializer(serializers.ModelSerializer):
     user = SlugRelatedField(
-        slug_field='username',
         read_only=True,
+        slug_field='username',
         default=serializers.CurrentUserDefault()
     )
     following = SlugRelatedField(
@@ -48,19 +50,18 @@ class FollowSerializer(serializers.ModelSerializer):
     )
 
     class Meta:
-        fields = ('user', 'following')
+        fields = '__all__'
         model = Follow
-
         validators = [
             UniqueTogetherValidator(
                 queryset=Follow.objects.all(),
-                fields=('user', 'following')
+                fields=('following', 'user'),
+                message=('Подписка на автора оформлена ранее!')
             )
         ]
 
-    def validate_following(self, value):
-        if str(value) == self.context['request'].user.username:
+    def validate(self, data):
+        if self.context['request'].user == data['following']:
             raise serializers.ValidationError(
-                'Нельзя подписаться на самого себя!'
-            )
-        return value
+                'Подписаться на самого себя невозможно!')
+        return data
